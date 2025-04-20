@@ -1,12 +1,17 @@
-# Hugging Face Inference Benchmarking Tools
+# Hugging Face Performance Benchmarking Tools
 
-This directory contains tools for benchmarking and evaluating Hugging Face transformer models, with a focus on performance comparison between CPU and GPU execution.
+This directory contains tools for benchmarking and evaluating Hugging Face transformer models on MacBook Pro with M2 Pro chip, with a focus on performance comparison between CPU and GPU (MPS) execution. The tools are specifically optimized for Apple Silicon GPUs using Metal Performance Shaders.
+
+Two main benchmarking tools are provided:
+
+1. **Inference Benchmarking** (`test1_cpu_gpu_inference.py`): Compare CPU vs GPU performance for model inference
+2. **DPO Fine-tuning Benchmarking** (`test2_cpu_gpu_dpo.py`): Compare CPU vs GPU performance for Direct Preference Optimization (DPO) fine-tuning
 
 ## Available Scripts
 
-### `test1_cpu_gpu.py`
+### `test1_cpu_gpu_inference.py`
 
-A comprehensive benchmarking tool that compares the execution time of running a Hugging Face model on CPU versus GPU.
+A comprehensive benchmarking tool that compares the execution time of running a Hugging Face model inference on CPU versus GPU.
 
 #### Features
 
@@ -132,19 +137,156 @@ Outputs match (first run): False
 Note: Different outputs are expected when using sampling (do_sample=True)
 ```
 
+### `test2_cpu_gpu_dpo.py`
+
+An advanced benchmarking tool that compares the performance of fine-tuning a small language model using TRL's Direct Preference Optimization (DPO) method on CPU versus GPU.
+
+#### Features
+
+- Compares training efficiency between CPU and MPS GPU acceleration
+- Measures both training time and model quality metrics
+- Uses LoRA (Low-Rank Adaptation) for efficient fine-tuning
+- Supports 8-bit quantization for larger models
+- Tracks memory usage throughout training
+- Compiles comprehensive statistics in pandas DataFrames
+- Exports results to CSV files for further analysis
+- Compatible with MacBook Pro with M2 Pro chip using MPS acceleration
+- VSCode integration for direct execution without command line
+
+#### Requirements
+
+- Python 3.6+
+- PyTorch 1.12+ (for MPS support on Apple Silicon)
+- Transformers library
+- TRL library for DPO fine-tuning
+- PEFT library for parameter-efficient fine-tuning
+- Datasets library
+- pandas and numpy for statistics compilation
+- psutil for memory tracking
+
+#### Usage
+
+##### Command Line Execution
+
+```bash
+# Basic usage with a small model
+python test2_cpu_gpu_dpo.py --model_path facebook/opt-350m
+
+# Custom dataset example
+python test2_cpu_gpu_dpo.py --model_path facebook/opt-350m --dataset anthropic/hh-rlhf --subset harmless-base
+
+# Configure training parameters
+python test2_cpu_gpu_dpo.py --model_path facebook/opt-350m --epochs 5 --batch_size 8
+
+# Run only CPU or GPU benchmark
+python test2_cpu_gpu_dpo.py --model_path facebook/opt-350m --cpu_only  # CPU only
+python test2_cpu_gpu_dpo.py --model_path facebook/opt-350m --gpu_only  # GPU only
+
+# Use 8-bit quantization for larger models
+python test2_cpu_gpu_dpo.py --model_path facebook/opt-1.3b --use_8bit
+```
+
+##### Direct Execution in VSCode
+
+The script includes built-in options for running directly in VSCode without using the command line:
+
+1. **Option 1: Hardcoded Arguments**
+   - Open the script in VSCode
+   - Go to the bottom of the file
+   - Comment out the "OPTION 1" block
+   - Uncomment the "OPTION 2" block
+   - Update the model path and other parameters
+   - Run the script normally (F5 or Run button)
+
+#### Arguments
+
+- `--model_path` (optional): Path to the base model (local directory or HF model ID) (default: "facebook/opt-350m")
+- `--dataset` (optional): Dataset name on Hugging Face Hub (default: "anthropic/hh-rlhf")
+- `--subset` (optional): Dataset subset name (default: "harmless-base")
+- `--epochs` (optional): Number of training epochs (default: 3)
+- `--batch_size` (optional): Batch size for training and evaluation (default: 4)
+- `--output_dir` (optional): Directory to save model and outputs (default: "./dpo_outputs")
+- `--cpu_only` (flag): Run only on CPU even if GPU is available
+- `--gpu_only` (flag): Run only on GPU (skips CPU benchmark)
+- `--use_8bit` (flag): Use 8-bit quantization for loading larger models
+
+#### Example Output
+
+```
+Apple Silicon GPU (MPS) is available - Using Metal Performance Shaders
+
+==================================================
+ STARTING CPU BENCHMARK 
+==================================================
+Setting up DPO trainer on cpu
+Initial memory usage: 123.45 MB
+Loading tokenizer from facebook/opt-350m
+Loading model on cpu device
+...
+
+==================================================
+ STARTING GPU (MPS) BENCHMARK 
+==================================================
+Setting up DPO trainer on mps
+Initial memory usage: 125.67 MB
+Loading tokenizer from facebook/opt-350m
+Loading model on mps device
+...
+
+==================================================
+ PERFORMANCE COMPARISON RESULTS 
+==================================================
+
+EFFICIENCY METRICS:
+                Metric         CPU   GPU (MPS)  Speedup (CPU/GPU)
+Total Training Time (s)     1256.78     329.45              3.81
+Avg Time per Epoch (s)       418.93     109.82              3.82
+Setup Time (s)                89.45      76.23              1.17
+Peak Memory Usage             4.56 GB    5.23 GB            N/A
+Memory Increase               2.34 GB    3.12 GB            N/A
+
+ACCURACY METRICS:
+    Metric        CPU   GPU (MPS)  Difference (GPU-CPU)
+     loss      0.3456      0.3423              -0.0033
+accuracy      0.8723      0.8745               0.0022
+      f1      0.8534      0.8567               0.0033
+precision     0.8612      0.8645               0.0033
+  recall      0.8456      0.8489               0.0033
+
+Results saved to ./dpo_outputs
+```
+
 ## Best Practices
 
 - For the most accurate benchmarks, close other applications before running tests
-- Use the `--runs` parameter to perform multiple runs automatically (e.g., `--runs 5`)
+- Use the `--runs` parameter with inference benchmarks to perform multiple runs automatically (e.g., `--runs 5`)
 - For deterministic comparisons, modify the generation parameters to disable sampling
 - The first run may be slower due to compilation/optimization overhead
 - When running in VSCode, use the interactive cell option for quick testing of specific functions
 - For production use or batch processing, use the command-line interface
+- For fine-tuning benchmarks, start with a small model like OPT-350M before trying larger models
+- When benchmarking larger models with the DPO script, use the `--use_8bit` flag to reduce memory usage
 
 ## Troubleshooting
 
+### General Issues
 - If you encounter "MPS not available" errors on Apple Silicon, ensure you have PyTorch 1.12+ installed
 - For CUDA errors on NVIDIA systems, verify that you have the correct CUDA toolkit installed
-- If you get "out of memory" errors, try reducing the model size or batch size
 - If running in VSCode and getting argument errors, check that you've properly configured the arguments in Option 2 or are using the interactive cell correctly
-- For import errors, ensure you have all dependencies installed: `pip install torch pandas numpy transformers`
+
+### Inference Benchmark Issues
+- If you get "out of memory" errors during inference, try reducing the model size or batch size
+- For import errors with the inference benchmark: `pip install torch pandas numpy transformers`
+
+### DPO Fine-tuning Issues
+- For fine-tuning out of memory errors, try:
+  - Using the `--use_8bit` quantization flag
+  - Reducing the batch size with `--batch_size`
+  - Using a smaller model (e.g., OPT-350M)
+- If you encounter issues with TRL or PEFT, install the required dependencies:
+  ```bash
+  pip install trl peft accelerate datasets psutil scipy scikit-learn
+  ```
+- For Mac Silicon specific fine-tuning issues:
+  - Ensure you are running PyTorch 2.0+ for best MPS support
+  - Some operations may fall back to CPU execution - this is normal with the current state of MPS support
